@@ -6,6 +6,8 @@
 #include <iostream>
 #include <fstream>
 
+#include "shape.h"
+
 using namespace std;
 using namespace cv;
 
@@ -15,18 +17,16 @@ public:
     FrameCalculation(string window_name);
     void calculate(Mat& frame);
 
+    static Point contourCenter(vector<Point>& contour);
 private:
     void calibration(Mat& frame);
-    void selectContours(Mat& frame);
+    void selecPointers(Mat& frame);
     void identifyShape();
-    void writeToFile();
-    vector<double> shapeSignature();
 
     double malinowskaCoefficient(double L, double S);
     string intToString(int num);
     Vec3i HSVToRGB(Vec3i &hsv);
     int countMaskPixels(Mat& mask);
-    Point contourCenter(vector<Point>& contour);
     void drawSingleContour(Mat& out, vector<Point>& contour, int size, bool close = false);
 
     string window_name;
@@ -44,8 +44,8 @@ private:
 
     vector< vector<Point> > pointers_contours;
     vector< vector<Point> > contours; //kontury pomocnicze
-    vector<Point> draw_points;
-    vector<Point> draw_contour;
+    vector<Point> draw_points; //punkty narysowane przez urzytkownika
+//    vector<Point> draw_contour; //
 
     bool calibrated;
     bool drawing;

@@ -28,7 +28,7 @@ void FrameCalculation::calculate(Mat &frame)
     if(calibrated)
     {
         frame.copyTo(output);
-        selectContours(frame); //wybranie konturów wskaźników
+        selecPointers(frame); //wybranie konturów wskaźników
         if(pointers_contours.size() == 1)
         {
             if(blink_counter > 0 && drawing) blink_counter--;
@@ -68,7 +68,7 @@ void FrameCalculation::calculate(Mat &frame)
             if(!identified)identifyShape(); //jeśli nie rozpoznano jeszcze narysowanego kształtu
             output = Mat::zeros(frame.rows, frame.cols, frame.type());
 
-            drawContours(output, vector<vector<Point> >(1,draw_contour), -1, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]), 3);
+//            drawContours(output, vector<vector<Point> >(1,draw_points), -1, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]), 3);
         }
         else //podczas rysowania
         {
@@ -143,7 +143,7 @@ void FrameCalculation::calibration(Mat &frame)
     putText(output, text, Point(10, 60), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 0, 0), 2);
 }
 
-void FrameCalculation::selectContours(Mat &frame)
+void FrameCalculation::selecPointers(Mat &frame)
 {
     pointers_contours.clear();
     cvtColor(frame, hsv, CV_RGB2HSV);
@@ -167,106 +167,15 @@ void FrameCalculation::selectContours(Mat &frame)
 void FrameCalculation::identifyShape()
 {
     identified = true;
+    vector<Point> draw_contour;
     approxPolyDP(draw_points, draw_contour, 5, true);
-    convexHull( Mat(draw_points), draw_contour, false );
+    convexHull( Mat(draw_points), draw_contour, false ); //otoczka wypukła
 
-    //TODO
-    //dodać wiele punktów pośrednich w otoczce wypukłej
-
-    vector<double> signature = shapeSignature();
-
-    //Rysowanie sygnatury
-    vector<Point> tmp_contours;
-    for(int i = 0; i < signature.size(); i++)
+    Shape shape(draw_contour);
+    if(shape.isValid())
     {
-        tmp_contours.push_back(Point(i, signature[i] * 100));
+        //TODO dodaj shape do jakiegoś kontenera obiektów
     }
-
-    Mat t = Mat::zeros(300, 300, CV_8SC3);
-    drawSingleContour(t, tmp_contours, 1);
-    imshow("Sygnatura", t);
-}
-
-void FrameCalculation::writeToFile()
-{
-    write_to_file = true;
-}
-
-vector<double> FrameCalculation::shapeSignature()
-{
-    int size = 32;
-    vector<double> signature(size);
-    for(double& d : signature) d = 0;
-    Point center = contourCenter(draw_contour);
-    double a;
-    double x, y;
-    double d;
-    int i;
-    cout << "================" << endl;
-    cout << size << endl << endl;
-
-    for(Point& p : draw_contour)
-    {
-        x = p.x - center.x;
-        y = p.y - center.y;
-        if(fabs(x) < 0.00001) a = M_PI_2;
-        else a = atan(fabs(y/x));
-        if(x > 0 && y < 0) a += M_PI_2;
-        else if(x > 0 && y > 0) a += M_PI;
-        else if(x < 0 && y > 0) a += M_PI_2 * 3.0;
-
-        d = sqrt(x*x + y*y);
-        i = a / 2.0 / M_PI * size;
-        cout << i << endl;
-        if(signature[i] == 0) signature[i] = d;
-        else signature[i] = (signature[i] + d) / 2;
-    }
-    cout << "================aaaaaaaaaaaaaaa" << endl;
-    //znajdowanie indeksu maksimum
-    int index_max = 0;
-    double max = signature[0];
-    for(int i = 1; i < size; i++)
-    {
-        if(signature[i] > max)
-        {
-            max = signature[i];
-            index_max = i;
-        }
-    }
-    if(max < 0.00001) max = 1;
-    //przesunięcie cykliczne tak aby maksimum było na początku oraz normalizacja do [0; 1]
-    vector<double> tmp;
-    for(int i = 0; i < index_max; i++)
-        tmp.push_back(signature[i]);
-
-    for(int i = 0; i + index_max < size; i++)
-        signature[i] = signature[i+index_max] / max;
-
-    for(int i = size - index_max; i < size; i++)
-        signature[i] = tmp[i - size + index_max] / max;
-
-    //usuwanie zer przez aproksymację liniową
-    int index1 = 0, index2 = 0;
-    double delta = 0;
-    for(int i = 0; i < size; i++)
-    {
-        if(signature[i] == 0)
-        {
-            index2 = i;
-        }
-        else
-        {
-            if(index1 != index2) //index1 - ostatni punkt niezerowy, index2 ostatni punkt zerowy
-            {
-                delta = (signature[index2 + 1] - signature[index1]) / (index2 - index1 + 1);
-                for(int j = index1 + 1; j <= index2; j++)
-                    signature[j] = signature[j-1] + delta;
-            }
-            index1 = index2 = i;
-        }
-    }
-
-    return signature;
 }
 
 string FrameCalculation::intToString(int num)
