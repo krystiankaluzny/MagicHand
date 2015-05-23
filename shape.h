@@ -13,6 +13,17 @@ using namespace cv;
 class Shape
 {
 public:
+    enum ShapeType
+    {
+        ST_RECTANGLE = 0,
+        ST_SQUARE = 1,
+        ST_CIRCLE = 2,
+        ST_TRIANGLE = 3,
+        ST_RIGTH_TRIANGLE = 4,
+
+        ST_NONE
+    };
+
     Shape();
     Shape(vector<Point>& draw_contour);
 
@@ -20,9 +31,11 @@ public:
 
 private:
     vector<double> shapeSignature(vector<Point> &contour);
+    void increaseContourPrecision(vector<Point> &contour);
     double pearsonCoefficient(vector<double>& s1, vector<double>& s2);
 
-    bool m_is_valid;
+    ShapeType m_type;
+    int m_size_signature;
 };
 
 #endif // SHAPE_H

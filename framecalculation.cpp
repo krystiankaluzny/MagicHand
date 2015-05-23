@@ -169,7 +169,7 @@ void FrameCalculation::identifyShape()
     identified = true;
     vector<Point> draw_contour;
     approxPolyDP(draw_points, draw_contour, 5, true);
-    convexHull( Mat(draw_points), draw_contour, false ); //otoczka wypukła
+//    convexHull( Mat(draw_points), draw_contour, false ); //otoczka wypukła //TODO sprawdzić czy potrzebne
 
     Shape shape(draw_contour);
     if(shape.isValid())
