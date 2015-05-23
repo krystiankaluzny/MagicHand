@@ -28,9 +28,10 @@ public:
     Shape(vector<Point>& draw_contour);
 
     bool isValid(); //jeżeli zidentyfikowane figurę
+    vector<Point> shape_contour;
 
 private:
-    vector<double> shapeSignature(vector<Point> &contour);
+    vector<double> shapeSignature(vector<Point> &contour, double *maximum = nullptr, int *index_of_max = nullptr);
     void increaseContourPrecision(vector<Point> &contour);
     double pearsonCoefficient(vector<double>& s1, vector<double>& s2);
 

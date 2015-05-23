@@ -11,13 +11,18 @@
 using namespace std;
 using namespace cv;
 
+class Shape;
+
 class FrameCalculation
 {
 public:
     FrameCalculation(string window_name);
+    ~FrameCalculation();
+
     void calculate(Mat& frame);
 
     static Point contourCenter(vector<Point>& contour);
+
 private:
     void calibration(Mat& frame);
     void selecPointers(Mat& frame);
@@ -42,6 +47,8 @@ private:
     Vec3i upper_color;
     Vec3i rgb_color;
 
+    vector<Shape*> shapes;
+
     vector< vector<Point> > pointers_contours;
     vector< vector<Point> > contours; //kontury pomocnicze
     vector<Point> draw_points; //punkty narysowane przez urzytkownika
@@ -50,10 +57,10 @@ private:
     bool calibrated;
     bool drawing;
     bool identified;
-    bool write_to_file;
     int calibration_windows_size;
     int calibration_counter;
-    int blink_counter; //zliczanie liczby kolejnych ramek na których nie ma żadnego wskaźnika
+    int blink_counter; //zliczanie liczby kolejnych ramek na których nie ma żadnego
+    int min_countur_size;
 };
 
 #endif // FRAMECALCULATION_H

@@ -14,13 +14,18 @@ FrameCalculation::FrameCalculation(string window_name)
     calibrated = false;
     drawing = false;
     identified = false;
-    write_to_file = false;
     blink_counter = 0;
     calibration_windows_size = 50;
     calibration_counter = 0;
+    min_countur_size = 20;
 
     morphology_element = Mat(3, 3, CV_8UC1, Scalar(0,0,0));
     circle( morphology_element, Point( morphology_element.cols/2, morphology_element.rows/2), morphology_element.rows/2, 255, -1);
+}
+
+FrameCalculation::~FrameCalculation()
+{
+    for(auto s : shapes) delete s;
 }
 
 void FrameCalculation::calculate(Mat &frame)
@@ -28,39 +33,60 @@ void FrameCalculation::calculate(Mat &frame)
     if(calibrated)
     {
         frame.copyTo(output);
-        selecPointers(frame); //wybranie konturów wskaźników
-        if(pointers_contours.size() == 1)
+        selecPointers(frame); //szukanie konturów wskaźników
+
+        if(pointers_contours.size() == 1)//rysowanie jeśli jeden wskaźnik
         {
-            if(blink_counter > 0 && drawing) blink_counter--;
-            if(!drawing)
+            if(blink_counter > 0) blink_counter--; //czekamy przez chwilę zanim zaczniemy rysować
+            if(blink_counter == 0 && !drawing) //zaczynamy rysowanie
             {
-                blink_counter = 0;
                 drawing = true;
                 draw_points.clear();
             }
-            draw_points.push_back(contourCenter(pointers_contours.at(0)));
-            identified = false;
-            write_to_file = false;
+            if(drawing) //dodajemy kolejne punkty
+            {
+                draw_points.push_back(FrameCalculation::contourCenter(pointers_contours.at(0)));
+                identified = false;
+                if(draw_points.size() > min_countur_size)
+                {
+                    double x, y, d;
+                    for(int i = 0; i < min_countur_size / 2; i++) //sprawdzamy czy zamkneliśmy rysowaną figurę
+                    {
+                        x = draw_points[draw_points.size() - 1].x - draw_points[i].x;
+                        y = draw_points[draw_points.size() - 1].y - draw_points[i].y;
+                        d = sqrt(x*x + y*y);
+                        //jeśli koniec zetkną się z początkiem o ile nie staliśmy w jednym miejscu to koniec rysowanie figury
+                        if(d < (min_countur_size / 2 - 1) && (contourArea(draw_points) > M_PI * min_countur_size * min_countur_size / 4))
+                        {
+                            blink_counter = 13;
+                            drawing = false;
+                        }
+                    }
+                }
+            }
         }
 //        else if(pointers_contours.size() > 1)
 //        {
 //            if(blink_counter > 0)
 //                blink_counter--;
 //        }
-        else
+        else //nie ma wskaźnika
         {
             blink_counter++;
         }
 
-        if(blink_counter > 10) //jeśli kursora nie ma przez 10 rramek to koniec rysowania
+        if(blink_counter > 12) //jeśli kursora nie ma przez 12 ramek i nie zamkneliśmy figury to koniec rysowania
         {
             drawing = false;
+            blink_counter = 13;
+            if(drawing)
+                draw_points.clear();
         }
 
 
-//        //narysowanie wskaźników
-//        for(int i = 0; i < pointers_contours.size(); i++)
-//            drawContours(output, pointers_contours, i, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]), -1);
+        //narysowanie wskaźników
+        for(int i = 0; i < pointers_contours.size(); i++)
+            drawContours(output, pointers_contours, i, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]), -1);
 
 
         if(!drawing) //jeśli rysownaie się skończyło to rozpoznaj kształt
@@ -68,13 +94,17 @@ void FrameCalculation::calculate(Mat &frame)
             if(!identified)identifyShape(); //jeśli nie rozpoznano jeszcze narysowanego kształtu
             output = Mat::zeros(frame.rows, frame.cols, frame.type());
 
-//            drawContours(output, vector<vector<Point> >(1,draw_points), -1, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]), 3);
+            drawContours(output, vector<vector<Point> >(1,draw_points), -1, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]), 3);
         }
         else //podczas rysowania
         {
             drawSingleContour(output, draw_points, 3);
         }
 
+        for(auto s : shapes)
+        {
+            drawSingleContour(output, s->shape_contour, 3, true);
+        }
         string text = "Przedzial: (" + intToString(lower_color[0]) + "; " + intToString(lower_color[1]) + "; " + intToString(lower_color[2]) + ") - "
                 +  "(" + intToString(upper_color[0]) + "; " + intToString(upper_color[1]) + "; " + intToString(upper_color[2]) + ")";
         putText(output, text, Point(10, 20), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 0, 0), 2);
@@ -167,13 +197,16 @@ void FrameCalculation::selecPointers(Mat &frame)
 void FrameCalculation::identifyShape()
 {
     identified = true;
+    if(draw_points.size() < min_countur_size) return;
     vector<Point> draw_contour;
-    approxPolyDP(draw_points, draw_contour, 5, true);
+    approxPolyDP(draw_points, draw_contour, 2, true);
 //    convexHull( Mat(draw_points), draw_contour, false ); //otoczka wypukła //TODO sprawdzić czy potrzebne
 
-    Shape shape(draw_contour);
-    if(shape.isValid())
+    cout << "Size " << draw_points.size() << endl;
+    Shape* shape  = new Shape(draw_contour);
+    if(shape->isValid())
     {
+        shapes.push_back(shape);
         //TODO dodaj shape do jakiegoś kontenera obiektów
     }
 }
@@ -219,13 +252,5 @@ Point FrameCalculation::contourCenter(vector<Point> &contour)
 
 void FrameCalculation::drawSingleContour(Mat &out, vector<Point> &contour, int size, bool close)
 {
-    if(close)
-    {
-        drawContours(out, vector<vector<Point> >(1,contour), -1, Scalar(rgb_color[0], 255, rgb_color[2]), size);
-    }
-    else
-    {
-
-        polylines(out, vector<vector<Point> >(1,contour), false, Scalar(rgb_color[0], 255, rgb_color[2]), size);
-    }
+    polylines(out, vector<vector<Point> >(1,contour), close, Scalar(rgb_color[0], 255, rgb_color[2]), size);
 }
