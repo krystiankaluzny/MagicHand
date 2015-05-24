@@ -6,13 +6,13 @@
 #define M_PI_2		1.57079632679489661923
 Shape::Shape()
 {
-    m_type = ST_NONE;
+    type = ST_NONE;
     m_size_signature = 100;
 }
 
 Shape::Shape(vector<Point> &draw_contour)
 {
-    m_type = ST_NONE;
+    type = ST_NONE;
     m_size_signature = 100;
 
     //=================== wzorcowe kształty ===================
@@ -31,6 +31,18 @@ Shape::Shape(vector<Point> &draw_contour)
     tmp_contours.push_back(Point(100, -150));
     tmp_contours.push_back(Point(100, 150));
     tmp_contours.push_back(Point(-100, 150));
+    reference_shapes.insert(make_pair(ST_RECTANGLE, tmp_contours));
+    tmp_contours.clear();
+    tmp_contours.push_back(Point(-250, 100));
+    tmp_contours.push_back(Point(-250, -100));
+    tmp_contours.push_back(Point(250, -100));
+    tmp_contours.push_back(Point(250, 100));
+    reference_shapes.insert(make_pair(ST_RECTANGLE, tmp_contours));
+    tmp_contours.clear();
+    tmp_contours.push_back(Point(-100, -250));
+    tmp_contours.push_back(Point(100, -250));
+    tmp_contours.push_back(Point(100, 250));
+    tmp_contours.push_back(Point(-100, 250));
     reference_shapes.insert(make_pair(ST_RECTANGLE, tmp_contours));
     tmp_contours.clear();
     tmp_contours.push_back(Point(-100, 0));
@@ -65,79 +77,93 @@ Shape::Shape(vector<Point> &draw_contour)
     int index_of_maximum; //index maksimum przed rotacją wektora sygnatury w shapeSignature
     increaseContourPrecision(draw_contour);
     vector<double> signature = shapeSignature(draw_contour, &max, &index_of_maximum);
-    for(double& s : signature)  if(s < norm_min) norm_min = s;
+    for(int i = 0; i < signature.size(); i++)
+        if(signature[i] < norm_min) norm_min = signature[i];
 
     //=================== rozpoznawanie typu ===================
     vector<double> reference_signature;
     double pearson_coefficient = 0.0, max_pearson_coefficient = 0.0;
     multimap<ShapeType, vector<Point> >::iterator iter;
+    //--------
+    Mat t = Mat::zeros(500, 250, CV_8SC3);
+    int k = -1;
+    //---------
     if(Shape::malinowskaCoefficient(draw_contour) > 0.1)
         for(iter = reference_shapes.begin(); iter != reference_shapes.end(); iter++)
         {
+            k++;
             increaseContourPrecision((*iter).second);
             reference_signature = shapeSignature((*iter).second);
             pearson_coefficient = pearsonCoefficient(signature, reference_signature);
             if(pearson_coefficient > 0.5 && pearson_coefficient > max_pearson_coefficient)
             {
                 max_pearson_coefficient = pearson_coefficient;
-                m_type = static_cast<ShapeType>((*iter).first);
+                type = static_cast<ShapeType>((*iter).first);
             }
-        }
-    else m_type = ST_CIRCLE;
 
-//    cout << m_type << " " << pearson_coefficient << " " << max_pearson_coefficient << endl;
-        cout << "Malinowska " << Shape::malinowskaCoefficient(draw_contour) << " " << norm_min << endl;
+            tmp_contours.clear();
+            for(int i = 0; i < reference_signature.size(); i++)
+                tmp_contours.push_back(Point(i + reference_signature.size(), reference_signature[i] * 80 + k * 40));
+            polylines(t, vector<vector<Point> >(1,tmp_contours), false, Scalar(rand()%255, rand()%255, rand()%255), 1);
+        }
+    else type = ST_CIRCLE;
+
+    cout << "type przed" << " " << (type == ST_CIRCLE ? "ST_CIRCLE" : (type == ST_RECTANGLE ? "ST_RECTANGLE" : (type == ST_TRIANGLE ? "ST_TRIANGLE" : "ST_NONE")))  << " " << max_pearson_coefficient << endl;
+    cout << "Malinowska " << Shape::malinowskaCoefficient(draw_contour) << " " << norm_min << endl;
 
     //=================== aproksymacja figury ===================
     vector<int> pick_index;
-    if(m_type != ST_NONE)
+    if(type != ST_NONE)
     {
         center = Shape::contourCenter(draw_contour);
         pick_index.push_back(0);
 
-        int poch1 = 0, poch2 = 0;
+        double poch1 = 0, poch2 = 0;
         for(int i = 1; i < signature.size() - 1; i++)
         {
-            if(signature[i-1] < signature[i]) poch2 = 1;
-            else if(signature[i-1] > signature[i]) poch2 = -1;
-            else poch2 = 0;
+            poch2 = signature[i] - signature[i-1];
 
-            if(poch1 == 1 && poch2 == -1 && signature[i] > norm_min * 1.2 ) pick_index.push_back(i);
+            if(poch1 > 0 && poch2 < 0 && signature[i] > norm_min * 1.2 && i - pick_index[pick_index.size()-1] > 5)
+            {
+                cout << poch1 * poch2 * 1000 << endl;
+                pick_index.push_back(i);
+            }
             poch1 = poch2;
         }
 
-//        cout << "DUPA " << index_of_maximum <<endl;
-//        for(int& a : pick_index)
-//            cout << a << endl;
-//            cout << 2.0 * M_PI * (a + index_of_maximum) / m_size_signature << endl;
         double angle;
-        if(m_type == ST_RECTANGLE)
+        if(type == ST_RECTANGLE)
         {
-            if(pick_index.size() < 4 || pick_index.size() > 6) m_type = ST_NONE;
-            angle = 2.0 * M_PI * (index_of_maximum) / m_size_signature;
-            shape_contour.push_back(Point(-cos(angle) * max * 0.92 + center.x,
-                                          -sin(angle) * max * 0.92 + center.y));
-            angle = 2.0 * M_PI * (pick_index[1] + index_of_maximum) / m_size_signature;
-            shape_contour.push_back(Point(-cos(angle) * max * 0.92 + center.x,
-                                          -sin(angle) * max * 0.92 + center.y));
-            angle = 2.0 * M_PI * (index_of_maximum) / m_size_signature + M_PI;
-            shape_contour.push_back(Point(-cos(angle) * max * 0.92 + center.x,
-                                          -sin(angle) * max * 0.92 + center.y));
-            angle = 2.0 * M_PI * (pick_index[1] + index_of_maximum) / m_size_signature + M_PI;
-            shape_contour.push_back(Point(-cos(angle) * max * 0.92 + center.x,
-                                          -sin(angle) * max * 0.92 + center.y));
+            if(pick_index.size() < 3 || pick_index.size() > 7) type = ST_NONE;
+            else if((pick_index.size() == 3 || pick_index.size() == 7) && max_pearson_coefficient < 0.7) type = ST_NONE;
+            else
+            {
+                int tmp_index;
+                angle = 2.0 * M_PI * (index_of_maximum) / m_size_signature;
+                shape_contour.push_back(Point(-cos(angle) * max * 0.92 + center.x,
+                                              -sin(angle) * max * 0.92 + center.y));
+                angle = 2.0 * M_PI * (pick_index[1] + index_of_maximum) / m_size_signature;
+                shape_contour.push_back(Point(-cos(angle) * max * 0.92 + center.x,
+                                              -sin(angle) * max * 0.92 + center.y));
+                angle = 2.0 * M_PI * (index_of_maximum) / m_size_signature + M_PI;
+                shape_contour.push_back(Point(-cos(angle) * max * 0.92 + center.x,
+                                              -sin(angle) * max * 0.92 + center.y));
+                angle = 2.0 * M_PI * (pick_index[1] + index_of_maximum) / m_size_signature + M_PI;
+                shape_contour.push_back(Point(-cos(angle) * max * 0.92 + center.x,
+                                              -sin(angle) * max * 0.92 + center.y));
+            }
 
         }
-        else if(m_type == ST_TRIANGLE)
+        else if(type == ST_TRIANGLE)
         {
-            if(pick_index.size() < 3 || pick_index.size() > 5) m_type = ST_NONE;
+            if(pick_index.size() < 3 || pick_index.size() > 5) type = ST_NONE;
             angle = 2.0 * M_PI * index_of_maximum / m_size_signature;
             shape_contour.push_back(Point(-cos(angle) * signature[pick_index[0]] * max * 0.98 + center.x,
                                           -sin(angle) * signature[pick_index[0]] * max * 0.98 + center.y));
             int last_index = 0;
             for(int i = 1; i < pick_index.size(); i++)
             {
-                if((pick_index[i] - pick_index[last_index] > 40.0 / 360.0 * m_size_signature) && (pick_index[i] - pick_index[last_index] < 170.0 / 360.0 * m_size_signature))
+                if((pick_index[i] - pick_index[last_index] > 50.0 / 360.0 * m_size_signature) && (pick_index[i] - pick_index[last_index] < 170.0 / 360.0 * m_size_signature))
                 {
                     angle = 2.0 * M_PI * (pick_index[i] + index_of_maximum) / m_size_signature;
                     shape_contour.push_back(Point(-cos(angle) * signature[pick_index[i]] * max * 0.98 + center.x,
@@ -146,7 +172,7 @@ Shape::Shape(vector<Point> &draw_contour)
                 }
             }
         }
-        else if(m_type == ST_CIRCLE)
+        else if(type == ST_CIRCLE)
         {
             double r = (norm_min + signature[0]) / 2 * max;
             for(int i = 0; i < 40; i++)
@@ -155,9 +181,10 @@ Shape::Shape(vector<Point> &draw_contour)
         }
     }
 
+    cout << "type po" << " " << (type == ST_CIRCLE ? "ST_CIRCLE" : (type == ST_RECTANGLE ? "ST_RECTANGLE" : (type == ST_TRIANGLE ? "ST_TRIANGLE" : "ST_NONE")))  << " " << max_pearson_coefficient << endl;
 
     //=================== Rysowanie sygnatury ===================
-    Mat t = Mat::zeros(300, 300, CV_8SC3);
+
     for(int i = 0; i < reference_shapes.size(); i++)
     {
         tmp_contours.clear();
@@ -195,7 +222,31 @@ Shape::Shape(vector<Point> &draw_contour)
 
 bool Shape::isValid()
 {
-    return m_type != ST_NONE;
+    return type != ST_NONE;
+}
+
+void Shape::draw(Mat &out)
+{
+    Scalar color1, color2;
+    if(type == ST_CIRCLE)
+    {
+        color1 = Scalar(210, 0, 0);
+        color2 = Scalar(255, 0, 0);
+    }
+    else if(type == ST_RECTANGLE)
+    {
+        color1 = Scalar(0, 210, 0);
+        color2 = Scalar(0, 255, 0);
+    }
+    else if(type == ST_TRIANGLE)
+    {
+        color1 = Scalar(0, 0, 210);
+        color2 = Scalar(0, 0, 255);
+    }
+
+    fillPoly(out, vector<vector<Point> >(1,shape_contour), color1);
+    polylines(out, vector<vector<Point> >(1,shape_contour), true, color2, 2);
+    circle(out, center, 10, color2, -1);
 }
 
 double Shape::malinowskaCoefficient(vector<Point> &contours)

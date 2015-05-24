@@ -98,19 +98,21 @@ void FrameCalculation::calculate(Mat &frame)
         if(!drawing) //jeśli rysownaie się skończyło to rozpoznaj kształt
         {
             if(!identified)identifyShape(); //jeśli nie rozpoznano jeszcze narysowanego kształtu
-            output = Mat::zeros(frame.rows, frame.cols, frame.type());
+//            output = Mat::zeros(frame.rows, frame.cols, frame.type());
 
-            drawContours(output, vector<vector<Point> >(1,draw_points), -1, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]), 3);
+            drawContours(output, vector<vector<Point> >(1,draw_contour), -1, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]), 3);
         }
         else //podczas rysowania
         {
-            drawSingleContour(output, draw_points, 3);
+            drawSingleContour(output, draw_points, Scalar(rgb_color[0], 255, rgb_color[2]), 3);
         }
 
-        for(auto s : shapes)
-        {
-            drawSingleContour(output, s->shape_contour, 3, true);
-        }
+        alpha_buffor = Mat::zeros(frame.rows, frame.cols, frame.type());
+
+        for(auto s : shapes) s->draw(alpha_buffor);
+
+        output = alphaBlend(output, alpha_buffor, 0.8);
+
         string text = "Przedzial: (" + intToString(lower_color[0]) + "; " + intToString(lower_color[1]) + "; " + intToString(lower_color[2]) + ") - "
                 +  "(" + intToString(upper_color[0]) + "; " + intToString(upper_color[1]) + "; " + intToString(upper_color[2]) + ")";
         putText(output, text, Point(10, 20), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 0, 0), 2);
@@ -143,7 +145,7 @@ void FrameCalculation::calibration(Mat &frame)
     if(upper_color[1] > 255) upper_color[1] = 255;
     if(upper_color[2] > 255) upper_color[2] = 255;
 
-    rgb_color = HSVToRGB(average_color);
+    rgb_color = HSVToRGBColor(average_color);
 
 //    cvtColor(frame, hsv, CV_BGR2HSV);
     inRange(hsv, lower_color, upper_color, binary);
@@ -197,8 +199,7 @@ void FrameCalculation::identifyShape()
 {
     identified = true;
     if(draw_points.size() < min_countur_size) return;
-    vector<Point> draw_contour;
-    approxPolyDP(draw_points, draw_contour, 2, true);
+    approxPolyDP(draw_points, draw_contour, 2 , true);
 //    convexHull( Mat(draw_points), draw_contour, false ); //otoczka wypukła //TODO sprawdzić czy potrzebne
 
 //    cout << "Size " << draw_points.size() << endl;
@@ -206,7 +207,6 @@ void FrameCalculation::identifyShape()
     if(shape->isValid())
     {
         shapes.push_back(shape);
-        //TODO dodaj shape do jakiegoś kontenera obiektów
     }
 }
 
@@ -226,7 +226,7 @@ string FrameCalculation::intToString(int num)
     return buf;
 }
 
-Vec3i FrameCalculation::HSVToRGB(Vec3i& hsv)
+Vec3i FrameCalculation::HSVToRGBColor(Vec3i& hsv)
 {
     Mat RGB;
     Mat HSV(1, 1, CV_8UC3, Scalar(hsv[0], hsv[1], hsv[2]));
@@ -243,7 +243,33 @@ int FrameCalculation::countMaskPixels(Mat &mask)
     return sum;
 }
 
-void FrameCalculation::drawSingleContour(Mat &out, vector<Point> &contour, int size, bool close)
+void FrameCalculation::drawSingleContour(Mat &out, vector<Point> &contour, Scalar color, int size, bool fill, bool close)
 {
-    polylines(out, vector<vector<Point> >(1,contour), close, Scalar(rgb_color[0], 255, rgb_color[2]), size);
+    if(fill) fillPoly(out, vector<vector<Point> >(1,contour), color);
+    else polylines(out, vector<vector<Point> >(1,contour), close, color, size);
+}
+
+Mat FrameCalculation::alphaBlend(Mat &src1, Mat &src2, float alpha)
+{
+    if(src1.size != src2.size || src1.type() != src2.type()) return Mat();
+    Mat out(src1.rows, src1.cols, src1.type());
+    Vec3b color1, color2;
+    if(alpha > 1.0) alpha = 1.0;
+    else if(alpha < 0.0) alpha = 0.0;
+    float beta = 1.0 - alpha;
+
+    for(int i = 0; i < src1.rows; i++)
+    {
+        for(int j = 0; j < src1.cols; j++)
+        {
+            color1 = src1.at<Vec3b>(i, j);
+            color2 = src2.at<Vec3b>(i, j);
+            if(color1 == Vec3b(0, 0, 0))  out.at<Vec3b>(i, j) = color2;
+            else if(color2 == Vec3b(0, 0, 0)) out.at<Vec3b>(i, j) = color1;
+            else out.at<Vec3b>(i, j) = Vec3b(beta * color1[0] + alpha * color2[0],
+                                             beta * color1[1] + alpha * color2[1],
+                                             beta * color1[2] + alpha * color2[2]);
+        }
+    }
+    return out;
 }

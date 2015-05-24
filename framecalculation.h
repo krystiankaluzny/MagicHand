@@ -27,16 +27,17 @@ private:
     void identifyShape();
 
     string intToString(int num);
-    Vec3i HSVToRGB(Vec3i &hsv);
+    Vec3i HSVToRGBColor(Vec3i &hsv);
     int countMaskPixels(Mat& mask);
-    void drawSingleContour(Mat& out, vector<Point>& contour, int size, bool close = false);
+    void drawSingleContour(Mat& out, vector<Point>& contour, Scalar color, int size, bool fill = false, bool close = false);
+    Mat alphaBlend(Mat& src1, Mat& src2, float alpha);
 
     string window_name;
 
     Mat output;
     Mat hsv;
     Mat binary;
-//    Mat out, buffor;
+    Mat alpha_buffor;
     Mat morphology_element;
 
     Vec3i average_color;
@@ -45,6 +46,7 @@ private:
     Vec3i rgb_color;
 
     vector<Shape*> shapes;
+    vector<Point> draw_contour;
 
     vector< vector<Point> > pointers_contours;
     vector< vector<Point> > contours; //kontury pomocnicze

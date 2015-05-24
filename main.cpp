@@ -15,8 +15,8 @@ int main()
 //    cam.open(0);
 //    cam.open("data/video/prostokat.avi");
 //    cam.open("data/video/trojkat.avi");
-    cam.open("data/video/okrag.avi");
-//    cam.open("data/video/rozne.avi");
+//    cam.open("data/video/okrag.avi");
+    cam.open("data/video/rozne.avi");
 //    cam.open("data/video/zamykanie.avi");
 //        cam.open("data/video/y.avi");
     if(!cam.isOpened())
@@ -25,7 +25,7 @@ int main()
         return 1;
     }
 
-//    VideoWriter video("data/video/aa.avi",(int)cam.get(CV_CAP_PROP_FOURCC), 16, Size((int)cam.get(CV_CAP_PROP_FRAME_WIDTH),(int)cam.get(CV_CAP_PROP_FRAME_HEIGHT)) );
+//    VideoWriter video("data/video/rozne2.avi",(int)cam.get(CV_CAP_PROP_FOURCC), 16, Size((int)cam.get(CV_CAP_PROP_FRAME_WIDTH),(int)cam.get(CV_CAP_PROP_FRAME_HEIGHT)) );
 //    VideoWriter video("data/video/zamykanie.avi",(int)cam.get(CV_CAP_PROP_FOURCC), 16, Size((int)cam.get(CV_CAP_PROP_FRAME_WIDTH),(int)cam.get(CV_CAP_PROP_FRAME_HEIGHT)) );
 //    if(!video.isOpened())
 //    {
