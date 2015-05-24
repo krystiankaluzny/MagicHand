@@ -16,10 +16,8 @@ public:
     enum ShapeType
     {
         ST_RECTANGLE = 0,
-        ST_SQUARE = 1,
-        ST_CIRCLE = 2,
-        ST_TRIANGLE = 3,
-        ST_RIGTH_TRIANGLE = 4,
+        ST_CIRCLE,
+        ST_TRIANGLE,
 
         ST_NONE
     };
@@ -27,8 +25,12 @@ public:
     Shape();
     Shape(vector<Point>& draw_contour);
 
+    static double malinowskaCoefficient(vector<Point>& contours);
+    static Point contourCenter(vector<Point> &contour);
+
     bool isValid(); //jeżeli zidentyfikowane figurę
     vector<Point> shape_contour;
+    Point center;
 
 private:
     vector<double> shapeSignature(vector<Point> &contour, double *maximum = nullptr, int *index_of_max = nullptr);

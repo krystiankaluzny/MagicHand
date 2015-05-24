@@ -42,10 +42,12 @@ void FrameCalculation::calculate(Mat &frame)
             {
                 drawing = true;
                 draw_points.clear();
+                for(auto s : shapes) delete s;
+                shapes.clear();
             }
             if(drawing) //dodajemy kolejne punkty
             {
-                draw_points.push_back(FrameCalculation::contourCenter(pointers_contours.at(0)));
+                draw_points.push_back(Shape::contourCenter(pointers_contours.at(0)));
                 identified = false;
                 if(draw_points.size() > min_countur_size)
                 {
@@ -80,7 +82,11 @@ void FrameCalculation::calculate(Mat &frame)
             drawing = false;
             blink_counter = 13;
             if(drawing)
+            {
                 draw_points.clear();
+                for(auto s : shapes) delete s;
+                shapes.clear();
+            }
         }
 
 
@@ -114,12 +120,6 @@ void FrameCalculation::calculate(Mat &frame)
         calibration(frame);
     }
     imshow(window_name, output);
-}
-
-double FrameCalculation::malinowskaCoefficient(double L, double S)
-{
-    if(S < 0.00001) return 10;
-    return L / (2 * sqrt(M_PI * S)) - 1;
 }
 
 void FrameCalculation::calibration(Mat &frame)
@@ -180,13 +180,12 @@ void FrameCalculation::selecPointers(Mat &frame)
     inRange(hsv, lower_color, upper_color, binary);
     morphologyEx(binary, binary, MORPH_CLOSE, morphology_element, Point(-1, -1), 1);
     findContours(binary, contours, CV_RETR_LIST , CV_CHAIN_APPROX_NONE);
-    double area, length;
+    double area = 0;
     double mc = 0;
     for(int i = 0; i < contours.size(); i++)
     {
         area = contourArea(contours[i]);
-        length = arcLength(contours[i], true);
-        mc = malinowskaCoefficient(length, area);
+        mc = Shape::malinowskaCoefficient(contours[i]);
         if( mc < 0.35 && area > 530)
         {
             pointers_contours.push_back(contours[i]);
@@ -202,7 +201,7 @@ void FrameCalculation::identifyShape()
     approxPolyDP(draw_points, draw_contour, 2, true);
 //    convexHull( Mat(draw_points), draw_contour, false ); //otoczka wypukła //TODO sprawdzić czy potrzebne
 
-    cout << "Size " << draw_points.size() << endl;
+//    cout << "Size " << draw_points.size() << endl;
     Shape* shape  = new Shape(draw_contour);
     if(shape->isValid())
     {
@@ -242,12 +241,6 @@ int FrameCalculation::countMaskPixels(Mat &mask)
         for(int j = 0; j < mask.rows; j++)
             if(mask.at<unsigned char>(i, j) > 0) sum++;
     return sum;
-}
-
-Point FrameCalculation::contourCenter(vector<Point> &contour)
-{
-    Moments m = moments(contour, false);
-    return Point( m.m10 / m.m00 , m.m01 / m.m00 );
 }
 
 void FrameCalculation::drawSingleContour(Mat &out, vector<Point> &contour, int size, bool close)

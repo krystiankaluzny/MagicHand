@@ -21,14 +21,11 @@ public:
 
     void calculate(Mat& frame);
 
-    static Point contourCenter(vector<Point>& contour);
-
 private:
     void calibration(Mat& frame);
     void selecPointers(Mat& frame);
     void identifyShape();
 
-    double malinowskaCoefficient(double L, double S);
     string intToString(int num);
     Vec3i HSVToRGB(Vec3i &hsv);
     int countMaskPixels(Mat& mask);
