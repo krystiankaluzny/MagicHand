@@ -12,11 +12,11 @@ int main()
 {
 
     VideoCapture cam;
-    cam.open(0);
+//    cam.open(0);
 //    cam.open("data/video/prostokat.avi");
 //    cam.open("data/video/trojkat.avi");
 //    cam.open("data/video/okrag.avi");
-//    cam.open("data/video/rozne.avi");
+    cam.open("data/video/rozne.avi");
 //    cam.open("data/video/zamykanie.avi");
 //        cam.open("data/video/y.avi");
     if(!cam.isOpened())

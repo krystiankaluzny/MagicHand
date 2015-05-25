@@ -44,6 +44,8 @@ void FrameCalculation::calculate(Mat &frame)
             {
                 drawing = true;
                 draw_points.clear();
+                for(auto s : shapes) delete s;
+                shapes.clear();
             }
             if(drawing) //dodajemy kolejne punkty
             {
@@ -74,6 +76,7 @@ void FrameCalculation::calculate(Mat &frame)
             vector<Point> pointers_centers;
             for(auto c : pointers_contours)
                 pointers_centers.push_back(Contour::contourCenter(c));
+
             Point pc = Contour::contourCenter(pointers_centers);
             int x, y;
             double d;
@@ -104,8 +107,8 @@ void FrameCalculation::calculate(Mat &frame)
             if(drawing)
             {
                 draw_points.clear();
-//                for(auto s : shapes) delete s;
-//                shapes.clear();
+                for(auto s : shapes) delete s;
+                shapes.clear();
             }
         }
 

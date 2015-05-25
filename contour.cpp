@@ -17,7 +17,7 @@ double Contour::malinowskaCoefficient(vector<Point> &contours)
     return L / (2 * sqrt(M_PI * S)) - 1;
 }
 
-Point Contour::contourCenter(vector<Point> &contour)
+Point Contour::contourCenterOfGravity(vector<Point> &contour)
 {
     if(contour.size() == 0) return Point(-1, -1);
     double x = 0, y = 0;
@@ -30,7 +30,14 @@ Point Contour::contourCenter(vector<Point> &contour)
     x /= contour.size();
     y /= contour.size();
 
-    return Point( x , y);
+    return Point(x , y);
+}
+Point Contour::contourCenter(vector<Point> &contour)
+{
+    if(contour.size() == 0) return Point(-1, -1);
+
+    Moments mu = moments(contour, false );
+    return  Point(mu.m10/mu.m00 , mu.m01/mu.m00);
 }
 
 void Contour::increaseContourPrecision(vector<Point> &contour, int size)
@@ -95,7 +102,7 @@ void Contour::drawPoly(Mat &out, vector<Point> &poly, Point center, Scalar fill_
 void Contour::sortPoints(vector<Point> &points)
 {
     if(points.size() == 0) return;
-    Point c =  Contour::contourCenter(points);
+    Point c =  Contour::contourCenterOfGravity(points);
     auto compare = [&c](Point a, Point b)->bool
     {
         double fi1, fi2;
