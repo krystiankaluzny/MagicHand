@@ -7,6 +7,7 @@
 #include <fstream>
 
 #include "shape.h"
+#include "contour.h"
 
 using namespace std;
 using namespace cv;
@@ -29,7 +30,7 @@ private:
     string intToString(int num);
     Vec3i HSVToRGBColor(Vec3i &hsv);
     int countMaskPixels(Mat& mask);
-    void drawSingleContour(Mat& out, vector<Point>& contour, Scalar color, int size, bool fill = false, bool close = false);
+//    void drawSingleContour(Mat& out, vector<Point>& contour, Scalar color, int size, bool fill = false, bool close = false);
     Mat alphaBlend(Mat& src1, Mat& src2, float alpha);
 
     string window_name;

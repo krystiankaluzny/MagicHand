@@ -5,7 +5,8 @@ CONFIG -= qt
 
 SOURCES += main.cpp \
     framecalculation.cpp \
-    shape.cpp
+    shape.cpp \
+    contour.cpp
 
 LIBS += D:\Programy\OpenCV_2.3.1\mybuild\install\bin\libopencv_core231.dll
 LIBS += D:\Programy\OpenCV_2.3.1\mybuild\install\bin\libopencv_contrib231.dll
@@ -29,5 +30,6 @@ qtcAddDeployment()
 
 HEADERS += \
     framecalculation.h \
-    shape.h
+    shape.h \
+    contour.h
 

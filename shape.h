@@ -25,11 +25,9 @@ public:
     Shape();
     Shape(vector<Point>& draw_contour);
 
-    static double malinowskaCoefficient(vector<Point>& contours);
-    static Point contourCenter(vector<Point> &contour);
-
     bool isValid(); //jeżeli zidentyfikowane figurę
     void draw(Mat& out);
+    void moveTo(Point& point);
 
     vector<Point> shape_contour;
     Point center;
@@ -37,8 +35,7 @@ public:
 
 private:
     vector<double> shapeSignature(vector<Point> &contour, double *maximum = nullptr, int *index_of_max = nullptr);
-    void increaseContourPrecision(vector<Point> &contour);
-    double pearsonCoefficient(vector<double>& s1, vector<double>& s2);
+    void identifyShape(vector<Point> &draw_contour);
 
     int m_size_signature;
 };

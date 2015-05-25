@@ -34,6 +34,8 @@ void FrameCalculation::calculate(Mat &frame)
     {
         frame.copyTo(output);
         selecPointers(frame); //szukanie konturów wskaźników
+        alpha_buffor = Mat::zeros(frame.rows, frame.cols, frame.type());
+        for(auto s : shapes) s->draw(alpha_buffor);
 
         if(pointers_contours.size() == 1)//rysowanie jeśli jeden wskaźnik
         {
@@ -42,12 +44,10 @@ void FrameCalculation::calculate(Mat &frame)
             {
                 drawing = true;
                 draw_points.clear();
-                for(auto s : shapes) delete s;
-                shapes.clear();
             }
             if(drawing) //dodajemy kolejne punkty
             {
-                draw_points.push_back(Shape::contourCenter(pointers_contours.at(0)));
+                draw_points.push_back(Contour::contourCenter(pointers_contours.at(0)));
                 identified = false;
                 if(draw_points.size() > min_countur_size)
                 {
@@ -67,11 +67,31 @@ void FrameCalculation::calculate(Mat &frame)
                 }
             }
         }
-//        else if(pointers_contours.size() > 1)
-//        {
-//            if(blink_counter > 0)
-//                blink_counter--;
-//        }
+        else if(pointers_contours.size() > 2)
+        {
+            if(blink_counter > 0)
+                blink_counter--;
+            vector<Point> pointers_centers;
+            for(auto c : pointers_contours)
+                pointers_centers.push_back(Contour::contourCenter(c));
+            Point pc = Contour::contourCenter(pointers_centers);
+            int x, y;
+            double d;
+            for(auto s : shapes)
+            {
+                x = s->center.x - pc.x;
+                y = s->center.y - pc.y;
+                d = sqrt(x*x + y*y);
+                if(d < 40)
+                {
+                    s->moveTo(pc);
+                    break;
+                }
+
+            }
+            Contour::sortPoints(pointers_centers);
+            Contour::drawPoly(alpha_buffor, pointers_centers, pc, Scalar(rgb_color[0]/2, rgb_color[1]/2, rgb_color[2]/2));
+        }
         else //nie ma wskaźnika
         {
             blink_counter++;
@@ -84,8 +104,8 @@ void FrameCalculation::calculate(Mat &frame)
             if(drawing)
             {
                 draw_points.clear();
-                for(auto s : shapes) delete s;
-                shapes.clear();
+//                for(auto s : shapes) delete s;
+//                shapes.clear();
             }
         }
 
@@ -104,12 +124,8 @@ void FrameCalculation::calculate(Mat &frame)
         }
         else //podczas rysowania
         {
-            drawSingleContour(output, draw_points, Scalar(rgb_color[0], 255, rgb_color[2]), 3);
+            polylines(output, vector<vector<Point> >(1,draw_points), false, Scalar(rgb_color[0], 255, rgb_color[2]), 3);
         }
-
-        alpha_buffor = Mat::zeros(frame.rows, frame.cols, frame.type());
-
-        for(auto s : shapes) s->draw(alpha_buffor);
 
         output = alphaBlend(output, alpha_buffor, 0.8);
 
@@ -187,7 +203,7 @@ void FrameCalculation::selecPointers(Mat &frame)
     for(int i = 0; i < contours.size(); i++)
     {
         area = contourArea(contours[i]);
-        mc = Shape::malinowskaCoefficient(contours[i]);
+        mc = Contour::malinowskaCoefficient(contours[i]);
         if( mc < 0.35 && area > 530)
         {
             pointers_contours.push_back(contours[i]);
@@ -200,9 +216,8 @@ void FrameCalculation::identifyShape()
     identified = true;
     if(draw_points.size() < min_countur_size) return;
     approxPolyDP(draw_points, draw_contour, 2 , true);
-//    convexHull( Mat(draw_points), draw_contour, false ); //otoczka wypukła //TODO sprawdzić czy potrzebne
+//    convexHull( Mat(draw_points), draw_contour, false ); //otoczka wypukła
 
-//    cout << "Size " << draw_points.size() << endl;
     Shape* shape  = new Shape(draw_contour);
     if(shape->isValid())
     {
@@ -241,12 +256,6 @@ int FrameCalculation::countMaskPixels(Mat &mask)
         for(int j = 0; j < mask.rows; j++)
             if(mask.at<unsigned char>(i, j) > 0) sum++;
     return sum;
-}
-
-void FrameCalculation::drawSingleContour(Mat &out, vector<Point> &contour, Scalar color, int size, bool fill, bool close)
-{
-    if(fill) fillPoly(out, vector<vector<Point> >(1,contour), color);
-    else polylines(out, vector<vector<Point> >(1,contour), close, color, size);
 }
 
 Mat FrameCalculation::alphaBlend(Mat &src1, Mat &src2, float alpha)
