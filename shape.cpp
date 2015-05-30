@@ -8,7 +8,7 @@
 Shape::Shape()
 {
     type = ST_NONE;
-    size_signature = 100;
+    signature_size = 100;
     erasing_time = 0;
     max_erasing_time = 3000;
     center = Point(-1, -1);
@@ -83,7 +83,7 @@ bool Shape::removeShape(vector<Point> &pointers, int dt)
 
 vector<double> Shape::shapeSignature(vector<Point> &contour, double* maximum, int *index_of_max)
 {
-    vector<double> signature(size_signature);
+    vector<double> signature(signature_size);
     for(double& d : signature) d = 0;
     if(contour.size() == 0) return signature;
 
@@ -104,14 +104,14 @@ vector<double> Shape::shapeSignature(vector<Point> &contour, double* maximum, in
         else if(x <= 0 && y > 0) a = 2 * M_PI - a;
 
         d = sqrt(x*x + y*y);
-        i = a / 2.0 / M_PI * size_signature;
+        i = a / 2.0 / M_PI * signature_size;
         if(signature[i] == 0) signature[i] = d;
         else signature[i] = (signature[i] + d) / 2;
     }
     //znajdowanie indeksu maksimum
     int index_max = 0;
     double max = signature[0];
-    for(int i = 1; i < size_signature; i++)
+    for(int i = 1; i < signature_size; i++)
         if(signature[i] > max)
         {
             max = signature[i];
@@ -127,16 +127,16 @@ vector<double> Shape::shapeSignature(vector<Point> &contour, double* maximum, in
     for(int i = 0; i < index_max; i++)
         tmp.push_back(signature[i]);
 
-    for(int i = 0; i + index_max < size_signature; i++)
+    for(int i = 0; i + index_max < signature_size; i++)
         signature[i] = signature[i+index_max] / max;
 
-    for(int i = size_signature - index_max; i < size_signature; i++)
-        signature[i] = tmp[i - size_signature + index_max] / max;
+    for(int i = signature_size - index_max; i < signature_size; i++)
+        signature[i] = tmp[i - signature_size + index_max] / max;
 
     //usuwanie zer przez aproksymację liniową
     int index1 = 0, index2 = 0;
     double delta = 0;
-    for(int i = 0; i < size_signature; i++)
+    for(int i = 0; i < signature_size; i++)
     {
         if(signature[i] == 0)
         {
@@ -224,7 +224,7 @@ void Shape::identifyAndApproximation(vector<Point> &draw_contour)
     double max = 0, norm_min = 1.0;
     int index_of_maximum; //index maksimum PRZED cyklicznym przesunięciem w wektorze sygnatury w shapeSignature
     int index_of_minimum; //index minimum PO cyklicznym przesunięciem w wektorze sygnatury w shapeSignature (względem indeksu maksimum)
-    Contour::increaseContourPrecision(draw_contour, size_signature);
+    Contour::increaseContourPrecision(draw_contour, signature_size);
     vector<double> signature = shapeSignature(draw_contour, &max, &index_of_maximum);
 
     for(int i = 0; i < signature.size(); i++)
@@ -233,7 +233,7 @@ void Shape::identifyAndApproximation(vector<Point> &draw_contour)
             norm_min = signature[i];
             index_of_minimum = i;
         }
-    if(index_of_minimum > size_signature / 2) index_of_minimum -= size_signature / 2;
+    if(index_of_minimum > signature_size / 2) index_of_minimum -= signature_size / 2;
 
     //=================== rozpoznawanie typu ===================
     vector<double> reference_signature;
@@ -242,7 +242,7 @@ void Shape::identifyAndApproximation(vector<Point> &draw_contour)
 
     for(iter = reference_shapes.begin(); iter != reference_shapes.end(); iter++)
     {
-        Contour::increaseContourPrecision((*iter).second, size_signature);
+        Contour::increaseContourPrecision((*iter).second, signature_size);
         reference_signature = shapeSignature((*iter).second);
         pearson_coefficient = Contour::pearsonCoefficient(signature, reference_signature);
         if(pearson_coefficient > 0.6 && pearson_coefficient > max_pearson_coefficient)
@@ -269,24 +269,24 @@ void Shape::identifyAndApproximation(vector<Point> &draw_contour)
         {
             int resize_counter = 0;
 
-            if(index_of_minimum > size_signature / 4)
-                angle2 = (asin(min(contourArea(draw_contour) / (2 * max * max), 0.99)) + 4.0 * M_PI * (index_of_minimum - size_signature / 4) / size_signature) / 2;
+            if(index_of_minimum > signature_size / 4)
+                angle2 = (asin(min(contourArea(draw_contour) / (2 * max * max), 0.99)) + 4.0 * M_PI * (index_of_minimum - signature_size / 4) / signature_size) / 2;
             else
-                angle2 = (M_PI - asin(min(contourArea(draw_contour) / (2 * max * max), 0.99)) + 4.0 * M_PI * (index_of_minimum) / size_signature) / 2;
+                angle2 = (M_PI - asin(min(contourArea(draw_contour) / (2 * max * max), 0.99)) + 4.0 * M_PI * (index_of_minimum) / signature_size) / 2;
 
             while(true)
             {
                 shape_contour.clear();
-                angle = 2.0 * M_PI * (index_of_maximum) / size_signature;
+                angle = 2.0 * M_PI * (index_of_maximum) / signature_size;
                 shape_contour.push_back(Point(-cos(angle) * max * 0.92 + center.x,
                                               -sin(angle) * max * 0.92 + center.y));
-                angle = 2.0 * M_PI * (index_of_maximum) / size_signature + angle2;
+                angle = 2.0 * M_PI * (index_of_maximum) / signature_size + angle2;
                 shape_contour.push_back(Point(-cos(angle) * max * 0.92 + center.x,
                                               -sin(angle) * max * 0.92 + center.y));
-                angle = 2.0 * M_PI * (index_of_maximum) / size_signature + M_PI;
+                angle = 2.0 * M_PI * (index_of_maximum) / signature_size + M_PI;
                 shape_contour.push_back(Point(-cos(angle) * max * 0.92 + center.x,
                                               -sin(angle) * max * 0.92 + center.y));
-                angle = 2.0 * M_PI * (index_of_maximum) / size_signature + angle2 + M_PI;
+                angle = 2.0 * M_PI * (index_of_maximum) / signature_size + angle2 + M_PI;
                 shape_contour.push_back(Point(-cos(angle) * max * 0.92 + center.x,
                                               -sin(angle) * max * 0.92 + center.y));
 
@@ -314,14 +314,14 @@ void Shape::identifyAndApproximation(vector<Point> &draw_contour)
         {
             double max1 = 0, max2 = 0;
             int index_max1 = 0, index_max2 = 0;
-            double a = signature[0], b = signature[size_signature / 2], c;
+            double a = signature[0], b = signature[signature_size / 2], c;
 
             double d2_1, d2_2;
-            for(int i = 1; i < size_signature / 2; ++i)
+            for(int i = 1; i < signature_size / 2; ++i)
             {
                 c = signature[i];
-                d2_1 = sqrt(a * a + c * c - 2 * a * c * cos(2.0 * M_PI * i / size_signature));
-                d2_2 = sqrt(b * b + c * c - 2 * b * c * cos(M_PI - 2.0 * M_PI * i / size_signature));
+                d2_1 = sqrt(a * a + c * c - 2 * a * c * cos(2.0 * M_PI * i / signature_size));
+                d2_2 = sqrt(b * b + c * c - 2 * b * c * cos(M_PI - 2.0 * M_PI * i / signature_size));
                 if(d2_1 + d2_2 > max1)
                 {
                     max1 = d2_1 + d2_2;
@@ -329,11 +329,11 @@ void Shape::identifyAndApproximation(vector<Point> &draw_contour)
                 }
             }
 
-            for(int i = size_signature / 2 + 1; i < size_signature; ++i)
+            for(int i = signature_size / 2 + 1; i < signature_size; ++i)
             {
                 c = signature[i];
-                d2_1 = sqrt(a * a + c * c - 2 * a * c * cos(2.0 * M_PI * i / size_signature));
-                d2_2 = sqrt(b * b + c * c - 2 * b * c * cos(M_PI - 2.0 * M_PI * i / size_signature));
+                d2_1 = sqrt(a * a + c * c - 2 * a * c * cos(2.0 * M_PI * i / signature_size));
+                d2_2 = sqrt(b * b + c * c - 2 * b * c * cos(M_PI - 2.0 * M_PI * i / signature_size));
                 if(d2_1 + d2_2 > max2)
                 {
                     max2 = d2_1 + d2_2;
@@ -341,13 +341,13 @@ void Shape::identifyAndApproximation(vector<Point> &draw_contour)
                 }
             }
 
-            angle = 2.0 * M_PI * index_of_maximum / size_signature;
+            angle = 2.0 * M_PI * index_of_maximum / signature_size;
             shape_contour.push_back(Point(-cos(angle) * signature[0] * max * 0.98 + center.x,
                                           -sin(angle) * signature[0] * max * 0.98 + center.y));
-            angle = 2.0 * M_PI * (index_of_maximum + index_max1) / size_signature;
+            angle = 2.0 * M_PI * (index_of_maximum + index_max1) / signature_size;
             shape_contour.push_back(Point(-cos(angle) * signature[index_max1] * max * 0.98 + center.x,
                                           -sin(angle) * signature[index_max1] * max * 0.98 + center.y));
-            angle = 2.0 * M_PI * (index_of_maximum + index_max2) / size_signature;
+            angle = 2.0 * M_PI * (index_of_maximum + index_max2) / signature_size;
             shape_contour.push_back(Point(-cos(angle) * signature[index_max2] * max * 0.98 + center.x,
                                           -sin(angle) * signature[index_max2] * max * 0.98 + center.y));
         }
