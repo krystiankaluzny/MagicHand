@@ -37,7 +37,7 @@ Point Contour::contourCenter(vector<Point> &contour)
     if(contour.size() == 0) return Point(-1, -1);
 
     Moments mu = moments(contour, false );
-    return  Point(mu.m10/mu.m00 , mu.m01/mu.m00);
+    return Point(mu.m10/mu.m00, mu.m01/mu.m00);
 }
 
 void Contour::increaseContourPrecision(vector<Point> &contour, int size)
@@ -73,7 +73,8 @@ double Contour::pearsonCoefficient(vector<double> &s1, vector<double> &s2)
 
     double size = s1.size();
     double sum_XY = 0.0f, sum_X = 0.0f, sum_Y = 0.0f, sum_XS = 0.0f, sum_YS = 0.0f;
-    for (int i = 0; i < size; ++i) {
+    for (int i = 0; i < size; ++i)
+    {
         sum_XY += s1[i] * s2[i];
         sum_X += s1[i];
         sum_Y += s2[i];
@@ -82,7 +83,7 @@ double Contour::pearsonCoefficient(vector<double> &s1, vector<double> &s2)
     }
 
     double res = (size * sum_XY - sum_X * sum_Y) /
-            sqrtf((size * sum_XS - pow(sum_X, 2.0f)) * (size * sum_YS - pow(sum_Y, 2.0f)));
+            sqrt((size * sum_XS - pow(sum_X, 2.0f)) * (size * sum_YS - pow(sum_Y, 2.0f)));
 
     return fabs(res);
 }
@@ -111,5 +112,53 @@ void Contour::sortPoints(vector<Point> &points)
         return fi1 > fi2;
     };
     sort(points.begin(), points.end(), compare);
+}
+
+Mat Contour::alphaBlend(const Mat &src1, const Mat &src2, float alpha)
+{
+    if(src1.size != src2.size || src1.type() != src2.type()) return Mat();
+    Mat out(src1.rows, src1.cols, src1.type());
+    Vec3b color1, color2;
+    if(alpha > 1.0) alpha = 1.0;
+    else if(alpha < 0.0) alpha = 0.0;
+    float beta = 1.0 - alpha;
+
+    for(int i = 0; i < src1.rows; i++)
+    {
+        for(int j = 0; j < src1.cols; j++)
+        {
+            color1 = src1.at<Vec3b>(i, j);
+            color2 = src2.at<Vec3b>(i, j);
+            if(color1 == Vec3b(0, 0, 0))  out.at<Vec3b>(i, j) = color2;
+            else if(color2 == Vec3b(0, 0, 0)) out.at<Vec3b>(i, j) = color1;
+            else out.at<Vec3b>(i, j) = Vec3b(beta * color1[0] + alpha * color2[0],
+                                             beta * color1[1] + alpha * color2[1],
+                                             beta * color1[2] + alpha * color2[2]);
+        }
+    }
+    return out;
+}
+
+void Contour::alphaBlendMask(Mat &dst, Mat &intensity_mask, Scalar color, Point offset, float alpha)
+{
+    if(alpha > 1.0) alpha = 1.0;
+    else if(alpha < 0.0) alpha = 0.0;
+    float beta = 1.0 - alpha;
+    Vec3b color1, color2;
+    float intensity;
+    for(int i = offset.y, k = 0; i < dst.rows && k < intensity_mask.rows; ++i, ++k)
+    {
+        for(int j = offset.x, l = 0; j < dst.cols && l < intensity_mask.cols; ++j, ++l)
+        {
+            intensity = (float)intensity_mask.at<uchar>(k, l) / 255.0;
+            color1 = dst.at<Vec3b>(i, j);
+            color2 = Vec3b(intensity * color[0], intensity * color[1], intensity * color[2]);
+            if(color1 == Vec3b(0, 0, 0))  dst.at<Vec3b>(i, j) = color2;
+            else if(color2 == Vec3b(0, 0, 0)) dst.at<Vec3b>(i, j) = color1;
+            else dst.at<Vec3b>(i, j) = Vec3b(beta * color1[0] + alpha * color2[0],
+                                             beta * color1[1] + alpha * color2[1],
+                                             beta * color1[2] + alpha * color2[2]);
+        }
+    }
 }
 

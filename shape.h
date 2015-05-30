@@ -26,18 +26,24 @@ public:
     Shape(vector<Point>& draw_contour);
 
     bool isValid(); //jeżeli zidentyfikowane figurę
-    void draw(Mat& out);
-    void moveTo(Point& point);
+    void drawShape(Mat& out, int dt);
+    void moveShapeTo(Point& point);
+    void removeShape(vector<Point> &pointers, int dt);
 
-    vector<Point> shape_contour;
     Point center;
-    ShapeType type;
 
 private:
     vector<double> shapeSignature(vector<Point> &contour, double *maximum = nullptr, int *index_of_max = nullptr);
-    void identifyShape(vector<Point> &draw_contour);
+    void identifyAndApproximation(vector<Point> &draw_contour);
+    void createMask(); //tworzenie maski intensywności kolorów figury
 
-    int m_size_signature;
+    vector<Point> shape_contour;
+    int size_signature;
+    int erasing_time;
+    int max_erasing_time;
+    ShapeType type;
+    Point offset;
+    Mat intensity_mask;
 };
 
 #endif // SHAPE_H

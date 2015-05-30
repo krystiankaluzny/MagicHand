@@ -1,5 +1,7 @@
 #include "framecalculation.h"
+#include <algorithm>
 #include <cmath>
+
 #define M_PI		3.14159265358979323846
 #define M_PI_2		1.57079632679489661923
 
@@ -11,13 +13,13 @@ FrameCalculation::FrameCalculation(string window_name)
     upper_color = Vec3i(80, 150, 150);
     rgb_color = Vec3i(0, 255, 0);
 
-    calibrated = false;
-    drawing = false;
+    state = AS_CALIBRATION;
     identified = false;
-    blink_counter = 0;
+    state_counter = 0;
     calibration_windows_size = 50;
     calibration_counter = 0;
     min_countur_size = 20;
+    max_state_counter = 12;
 
     morphology_element = Mat(3, 3, CV_8UC1, Scalar(0,0,0));
     circle( morphology_element, Point( morphology_element.cols/2, morphology_element.rows/2), morphology_element.rows/2, 255, -1);
@@ -30,25 +32,30 @@ FrameCalculation::~FrameCalculation()
 
 void FrameCalculation::calculate(Mat &frame)
 {
-    if(calibrated)
+    if(state != AS_CALIBRATION)
     {
         frame.copyTo(output);
         selecPointers(frame); //szukanie konturów wskaźników
         alpha_buffor = Mat::zeros(frame.rows, frame.cols, frame.type());
-        for(auto s : shapes) s->draw(alpha_buffor);
 
-        if(pointers_contours.size() == 1)//rysowanie jeśli jeden wskaźnik
+        //usunięcie zbędnych obiektów z kontenera
+        shapes.erase(std::remove_if(shapes.begin(), shapes.end(), [](Shape* s){ if(!s->isValid()) {delete s; return true;} return false; }), shapes.end());
+
+        for(auto s : shapes) s->drawShape(alpha_buffor, 0);
+
+        if(pointers_contours.size() == 1)//rysowanie figur
         {
-            if(blink_counter > 0) blink_counter--; //czekamy przez chwilę zanim zaczniemy rysować
-            if(blink_counter == 0 && !drawing) //zaczynamy rysowanie
+            if(state != AS_DRAWING && state_counter > 0) state_counter--; //czekamy przez chwilę zanim możemy zmienić stan
+            if(state_counter <= 0 && state != AS_DRAWING) //zezwalamy na rozpoczęcie rysowania
             {
-                drawing = true;
+                state = AS_DRAWING;
                 draw_points.clear();
-                for(auto s : shapes) delete s;
-                shapes.clear();
             }
-            if(drawing) //dodajemy kolejne punkty
+            if(state == AS_DRAWING) //dodajemy kolejne punkty
             {
+                state_counter++;
+                if(state_counter > max_state_counter) state_counter = max_state_counter;
+
                 draw_points.push_back(Contour::contourCenter(pointers_contours.at(0)));
                 identified = false;
                 if(draw_points.size() > min_countur_size)
@@ -62,75 +69,100 @@ void FrameCalculation::calculate(Mat &frame)
                         //jeśli koniec zetkną się z początkiem o ile nie staliśmy w jednym miejscu to koniec rysowanie figury
                         if(d < (min_countur_size / 2 - 1) && (contourArea(draw_points) > M_PI * min_countur_size * min_countur_size / 4))
                         {
-                            blink_counter = 13;
-                            drawing = false;
+                            state = AS_SHOWING;
+                            state_counter = max_state_counter;
                         }
                     }
                 }
             }
         }
-        else if(pointers_contours.size() > 2)
+        else if(pointers_contours.size() == 2) //usuwanie figur
         {
-            if(blink_counter > 0)
-                blink_counter--;
-            vector<Point> pointers_centers;
-            for(auto c : pointers_contours)
-                pointers_centers.push_back(Contour::contourCenter(c));
-
-            Point pc = Contour::contourCenter(pointers_centers);
-            int x, y;
-            double d;
-            for(auto s : shapes)
+            if(state != AS_REMOVING && state_counter > 0) state_counter--; //czekamy przez chwilę zanim możemy zmienić stan
+            if(state_counter <= 0 && state != AS_REMOVING) //zezwalamy na rozpoczęcie usuwania
             {
-                x = s->center.x - pc.x;
-                y = s->center.y - pc.y;
-                d = sqrt(x*x + y*y);
-                if(d < 40)
-                {
-                    s->moveTo(pc);
-                    break;
-                }
-
+                state = AS_REMOVING;
+                draw_points.clear();
             }
-            Contour::sortPoints(pointers_centers);
-            Contour::drawPoly(alpha_buffor, pointers_centers, pc, Scalar(rgb_color[0]/2, rgb_color[1]/2, rgb_color[2]/2));
+            if(state == AS_REMOVING)
+            {
+                state_counter++;
+                if(state_counter > max_state_counter / 2) state_counter = max_state_counter / 2;
+
+                vector<Point> pointers_centers;
+                for(auto c : pointers_contours)
+                    pointers_centers.push_back(Contour::contourCenter(c));
+
+                for(auto s : shapes)
+                    s->removeShape(pointers_centers, 0);
+            }
+        }
+        else if(pointers_contours.size() > 2) //przenoszenie figur
+        {
+            if(state != AS_MOVING && state_counter > 0) state_counter--; //czekamy przez chwilę zanim możemy zmienić stan
+            if(state_counter <= 0 && state != AS_MOVING) //zezwalamy na rozpoczęcie przenoszenia
+            {
+                state = AS_REMOVING;
+                draw_points.clear();
+            }
+            if(state == AS_MOVING)
+            {
+                state_counter++;
+                if(state_counter > max_state_counter) state_counter = max_state_counter;
+
+                vector<Point> pointers_centers;
+                for(auto c : pointers_contours)
+                    pointers_centers.push_back(Contour::contourCenter(c));
+
+                Point pc = Contour::contourCenter(pointers_centers);
+                int x, y;
+                double d;
+                for(auto s : shapes)
+                {
+                    x = s->center.x - pc.x;
+                    y = s->center.y - pc.y;
+                    d = sqrt(x*x + y*y);
+                    if(d < 40)
+                    {
+                        s->moveShapeTo(pc);
+                        break;
+                    }
+                }
+                Contour::sortPoints(pointers_centers);
+//                shape_buffor = Mat::zeros(frame.rows, frame.cols, frame.type());
+                Contour::drawPoly(alpha_buffor, pointers_centers, pc, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]));
+                output = Contour::alphaBlend(output, alpha_buffor, 0.8);
+            }
         }
         else //nie ma wskaźnika
         {
-            blink_counter++;
-        }
-
-        if(blink_counter > 12) //jeśli kursora nie ma przez 12 ramek i nie zamkneliśmy figury to koniec rysowania
-        {
-            drawing = false;
-            blink_counter = 13;
-            if(drawing)
+            state_counter--;
+            if(state_counter <= 0) //zezwalamy na rozpoczęcie przenoszenia
             {
+                state_counter = 0;
+                state = AS_SHOWING;
                 draw_points.clear();
-                for(auto s : shapes) delete s;
-                shapes.clear();
             }
         }
-
 
         //narysowanie wskaźników
         for(int i = 0; i < pointers_contours.size(); i++)
             drawContours(output, pointers_contours, i, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]), -1);
 
 
-        if(!drawing) //jeśli rysownaie się skończyło to rozpoznaj kształt
+        if(state != AS_DRAWING) //jeśli rysownaie się skończyło to rozpoznaj kształt
         {
             if(!identified)identifyShape(); //jeśli nie rozpoznano jeszcze narysowanego kształtu
 //            output = Mat::zeros(frame.rows, frame.cols, frame.type());
 
-            drawContours(output, vector<vector<Point> >(1,draw_contour), -1, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]), 3);
+//            drawContours(output, vector<vector<Point> >(1,draw_contour), -1, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]), 3);
         }
         else //podczas rysowania
         {
             polylines(output, vector<vector<Point> >(1,draw_points), false, Scalar(rgb_color[0], 255, rgb_color[2]), 3);
         }
 
-        output = alphaBlend(output, alpha_buffor, 0.8);
+        output = Contour::alphaBlend(output, alpha_buffor, 0.8);
 
         string text = "Przedzial: (" + intToString(lower_color[0]) + "; " + intToString(lower_color[1]) + "; " + intToString(lower_color[2]) + ") - "
                 +  "(" + intToString(upper_color[0]) + "; " + intToString(upper_color[1]) + "; " + intToString(upper_color[2]) + ")";
@@ -166,7 +198,6 @@ void FrameCalculation::calibration(Mat &frame)
 
     rgb_color = HSVToRGBColor(average_color);
 
-//    cvtColor(frame, hsv, CV_BGR2HSV);
     inRange(hsv, lower_color, upper_color, binary);
 
     morphologyEx(binary, binary, MORPH_CLOSE, morphology_element, Point(-1, -1), 1);
@@ -180,7 +211,7 @@ void FrameCalculation::calibration(Mat &frame)
     if(area_sum / cm.total() > 0.95)
     {
         calibration_counter++;
-        if(calibration_counter > 100) calibrated = true;
+        if(calibration_counter > 100) state = AS_SHOWING;
     }
     else if(calibration_counter > 0) calibration_counter--;
 
@@ -219,7 +250,6 @@ void FrameCalculation::identifyShape()
     identified = true;
     if(draw_points.size() < min_countur_size) return;
     approxPolyDP(draw_points, draw_contour, 2 , true);
-//    convexHull( Mat(draw_points), draw_contour, false ); //otoczka wypukła
 
     Shape* shape  = new Shape(draw_contour);
     if(shape->isValid())
@@ -259,29 +289,4 @@ int FrameCalculation::countMaskPixels(Mat &mask)
         for(int j = 0; j < mask.rows; j++)
             if(mask.at<unsigned char>(i, j) > 0) sum++;
     return sum;
-}
-
-Mat FrameCalculation::alphaBlend(Mat &src1, Mat &src2, float alpha)
-{
-    if(src1.size != src2.size || src1.type() != src2.type()) return Mat();
-    Mat out(src1.rows, src1.cols, src1.type());
-    Vec3b color1, color2;
-    if(alpha > 1.0) alpha = 1.0;
-    else if(alpha < 0.0) alpha = 0.0;
-    float beta = 1.0 - alpha;
-
-    for(int i = 0; i < src1.rows; i++)
-    {
-        for(int j = 0; j < src1.cols; j++)
-        {
-            color1 = src1.at<Vec3b>(i, j);
-            color2 = src2.at<Vec3b>(i, j);
-            if(color1 == Vec3b(0, 0, 0))  out.at<Vec3b>(i, j) = color2;
-            else if(color2 == Vec3b(0, 0, 0)) out.at<Vec3b>(i, j) = color1;
-            else out.at<Vec3b>(i, j) = Vec3b(beta * color1[0] + alpha * color2[0],
-                                             beta * color1[1] + alpha * color2[1],
-                                             beta * color1[2] + alpha * color2[2]);
-        }
-    }
-    return out;
 }
