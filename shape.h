@@ -5,7 +5,7 @@
 #include <vector>
 #include <iostream>
 
-#include "framecalculation.h"
+#include "contour.h"
 
 using namespace std;
 using namespace cv;
@@ -28,7 +28,7 @@ public:
     bool isValid(); //jeżeli zidentyfikowane figurę
     void drawShape(Mat& out, int dt);
     void moveShapeTo(Point& point);
-    void removeShape(vector<Point> &pointers, int dt);
+    bool removeShape(vector<Point> &pointers, int dt);
 
     Point center;
 
