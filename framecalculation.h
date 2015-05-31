@@ -26,13 +26,13 @@ public:
         AS_SHOWING
     };
 
-    FrameCalculation(string window_name);
+    FrameCalculation(string window_name, bool video_from_file = false, float video_speed = 20);
     ~FrameCalculation();
 
     void calculate(Mat& frame);
 
 private:
-    void calibration(Mat& frame, int dt);           //wybieranie wykrywanego koloru wskaźników
+    void calibration(Mat& frame, int dt);   //wybieranie wykrywanego koloru wskaźników
     void selecPointers(Mat& frame);         //wybranie wskaźników z ramki
     void addShape();                        //dodanie figury jeśli została zidentyfikowana
 
@@ -72,6 +72,8 @@ private:
     frame_time last_time;                   //punkt czasu analizy ostatniej klatki
     frame_time current_time;                //punkty czasu analizy obecnej klatki
 
+    bool frame_counter_mode;                //opcja pozwalająca na poprawną analizę klatek pochodzących z pliku wideo
+    float frame_duration;                   //czas wyświetlania jednej klatki z pliku wideo na podstawie FPS, używany tylko jeśli frame_counter_mode == true;
 };
 
 #endif // FRAMECALCULATION_H

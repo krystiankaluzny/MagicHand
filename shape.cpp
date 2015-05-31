@@ -211,14 +211,34 @@ void Shape::identifyAndApproximation(vector<Point> &draw_contour)
     reference_shapes.insert(make_pair(ST_TRIANGLE, tmp_contours));
     tmp_contours.clear();
     tmp_contours.push_back(Point(0, 0));
-    tmp_contours.push_back(Point(1000, 0));
+    tmp_contours.push_back(Point(800, 0));
     tmp_contours.push_back(Point(0, 1000));
     reference_shapes.insert(make_pair(ST_TRIANGLE, tmp_contours));
     tmp_contours.clear();
     tmp_contours.push_back(Point(0, 0));
-    tmp_contours.push_back(Point(0, 1000));
+    tmp_contours.push_back(Point(0, 800));
     tmp_contours.push_back(Point(1000, 0));
     reference_shapes.insert(make_pair(ST_TRIANGLE, tmp_contours));
+
+    //koło
+    tmp_contours.clear();
+    tmp_contours.push_back(Point(500, 0));
+    tmp_contours.push_back(Point(456, 172));
+    tmp_contours.push_back(Point(334, 315));
+    tmp_contours.push_back(Point(154, 404));
+    tmp_contours.push_back(Point(-52, 422));
+    tmp_contours.push_back(Point(-250, 368));
+    tmp_contours.push_back(Point(-404, 249));
+    tmp_contours.push_back(Point(-489, 88));
+    tmp_contours.push_back(Point(-489, -88));
+    tmp_contours.push_back(Point(-404, -249));
+    tmp_contours.push_back(Point(-250, -368));
+    tmp_contours.push_back(Point(-52, -422));
+    tmp_contours.push_back(Point(154, -404));
+    tmp_contours.push_back(Point(334, -315));
+    tmp_contours.push_back(Point(456, -172));
+    tmp_contours.push_back(Point(500, 0));
+    reference_shapes.insert(make_pair(ST_CIRCLE, tmp_contours));
 
     //=================== sygnatura konturu wejściowego ===================
     double max = 0, norm_min = 1.0;
@@ -247,17 +267,24 @@ void Shape::identifyAndApproximation(vector<Point> &draw_contour)
         pearson_coefficient = Contour::pearsonCoefficient(signature, reference_signature);
         if(pearson_coefficient > 0.6 && pearson_coefficient > max_pearson_coefficient)
         {
-            max_pearson_coefficient = pearson_coefficient;
-            type = static_cast<ShapeType>((*iter).first);
+            if(static_cast<ShapeType>((*iter).first) == ST_CIRCLE)
+            {
+                if(norm_min > 0.60) //jeżeli okrąg nie jest zbyt owalny
+                {
+                    max_pearson_coefficient = pearson_coefficient;
+                    type = static_cast<ShapeType>((*iter).first);
+                }
+            }
+            else
+            {
+                max_pearson_coefficient = pearson_coefficient;
+                type = static_cast<ShapeType>((*iter).first);
+            }
         }
     }
     double malinowska_coefficient = Contour::malinowskaCoefficient(draw_contour);
-    if((max_pearson_coefficient < 0.80 && malinowska_coefficient < 0.1) || malinowska_coefficient < 0.03) type = ST_CIRCLE;
-
-     //----------------------------------------
-    cout << "type przed" << " " << (type == ST_CIRCLE ? "ST_CIRCLE" : (type == ST_RECTANGLE ? "ST_RECTANGLE" : (type == ST_TRIANGLE ? "ST_TRIANGLE" : "ST_NONE")))  << " " << max_pearson_coefficient << endl;
-    cout << "Malinowska " << Contour::malinowskaCoefficient(draw_contour) << " " << norm_min << endl;
-     //----------------------------------------
+    if(type != ST_CIRCLE)
+        if((max_pearson_coefficient < 0.75 && malinowska_coefficient < 0.11) || malinowska_coefficient < 0.06) type = ST_CIRCLE;
 
     //=================== aproksymacja figury ===================
     if(type != ST_NONE)
@@ -291,9 +318,8 @@ void Shape::identifyAndApproximation(vector<Point> &draw_contour)
                                               -sin(angle) * max * 0.92 + center.y));
 
                 area_ratio = contourArea(shape_contour) / contourArea(draw_contour);
-                if(area_ratio < 0.8) //prostokąt jest za mały
+                if(area_ratio < 0.75) //prostokąt jest za mały
                 {
-                    cout << "za mały " << angle2 << endl;
                     if(angle2 < M_PI_2) angle2 *= 1.05;
                     else angle2 /= 1.05;
                     ++resize_counter;
@@ -301,7 +327,6 @@ void Shape::identifyAndApproximation(vector<Point> &draw_contour)
                 }
                 else if(area_ratio > 1.2) //prostokąt jest za duży
                 {
-                    cout << "za duzy " << angle2 << endl;
                     if(angle2 < M_PI_2) angle2 /= 1.05;
                     else angle2 *= 1.05;
                     ++resize_counter;
@@ -359,7 +384,6 @@ void Shape::identifyAndApproximation(vector<Point> &draw_contour)
                                               r * sin(2.0 * M_PI * i / 40) + center.y));
         }
     }
-    cout << "type PO" << " " << (type == ST_CIRCLE ? "ST_CIRCLE" : (type == ST_RECTANGLE ? "ST_RECTANGLE" : (type == ST_TRIANGLE ? "ST_TRIANGLE" : "ST_NONE")))  << " " << max_pearson_coefficient << endl;
 }
 
 void Shape::createMask()
@@ -378,8 +402,8 @@ void Shape::createMask()
 
     intensity_mask = Mat(br.size(), CV_8UC1);
     intensity_mask.setTo(0);
-    fillPoly(intensity_mask, vector< vector<Point> >(1, shape_contour), 255);
-    polylines(intensity_mask, vector< vector<Point> >(1, shape_contour), true, 215, 2);
+    fillPoly(intensity_mask, vector< vector<Point> >(1, shape_contour), 255); //wypełnienie ma pełną intensywność koloru
+    polylines(intensity_mask, vector< vector<Point> >(1, shape_contour), true, 215, 2); //krawędź ma mniejszą intensywność
     if(center != Point(-1, -1))
-        circle(intensity_mask, Point(center.x - br.x, center.y - br.y), 10, 215, -1);
+        circle(intensity_mask, Point(center.x - br.x, center.y - br.y), 10, 215, -1); //środek również ma mniejszą intensywność
 }

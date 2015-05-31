@@ -90,9 +90,9 @@ double Contour::pearsonCoefficient(vector<double> &s1, vector<double> &s2)
 
 void Contour::drawPoly(Mat &out, vector<Point> &poly, Point center, Scalar fill_color)
 {
-    Scalar color2(fill_color[0]-40 > 0 ? fill_color[0]-40 : 0,
-                  fill_color[1]-40 > 0 ? fill_color[1]-40 : 0,
-                  fill_color[2]-40 > 0 ? fill_color[2]-40 : 0);
+    Scalar color2(fill_color[0]-40 > 0 ? fill_color[0]-40 : 1,
+                  fill_color[1]-40 > 0 ? fill_color[1]-40 : 1,
+                  fill_color[2]-40 > 0 ? fill_color[2]-40 : 1);
 
     fillPoly(out, vector< vector<Point> >(1,poly), fill_color);
     polylines(out, vector< vector<Point> >(1,poly), true, color2, 2);

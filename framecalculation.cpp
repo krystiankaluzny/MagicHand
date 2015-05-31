@@ -5,9 +5,13 @@
 #define M_PI		3.14159265358979323846
 #define M_PI_2		1.57079632679489661923
 
-FrameCalculation::FrameCalculation(string window_name)
+FrameCalculation::FrameCalculation(string window_name, bool video_from_file, float video_speed)
 {
     this->window_name = window_name;
+    frame_counter_mode = video_from_file;
+    if(video_speed < 0.01) video_speed = 20;
+    frame_duration = 1000.0 / video_speed;
+
     average_color = Vec3i(60, 100, 100);
     lower_color = Vec3i(40, 50, 50);
     upper_color = Vec3i(80, 150, 150);
@@ -16,7 +20,7 @@ FrameCalculation::FrameCalculation(string window_name)
     identified = false;
     calibration_windows_size = 50;
     calibration_time_counter = 0;
-    max_calibration_time_counter = 10000;
+    max_calibration_time_counter = 5000;
 
     state = AS_CALIBRATION;
     state_time_counter = 0;
@@ -37,11 +41,19 @@ FrameCalculation::~FrameCalculation()
 
 void FrameCalculation::calculate(Mat &frame)
 {
-    current_time = std::chrono::high_resolution_clock::now();
-    int dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time).count();
-    last_time = current_time;
-
-//    cout << "DELTA " << dt << endl;
+    int dt;
+    if(frame_counter_mode)
+    {
+        dt = frame_duration;
+        if(state != AS_CALIBRATION) dt *= 3;
+    }
+    else
+    {
+        current_time = std::chrono::high_resolution_clock::now();
+        dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_time).count();
+        last_time = current_time;
+    }
+//    cout << (state != AS_CALIBRATION ) << " " << dt << endl;
 
     if(state != AS_CALIBRATION)
     {
@@ -125,6 +137,7 @@ void FrameCalculation::calculate(Mat &frame)
                 for(auto c : pointers_contours)
                     pointers_centers.push_back(Contour::contourCenter(c));
 
+                Contour::sortPoints(pointers_centers);
                 Point pc = Contour::contourCenter(pointers_centers);
                 int x, y;
                 double d;
@@ -139,17 +152,18 @@ void FrameCalculation::calculate(Mat &frame)
                         break;
                     }
                 }
-                Contour::sortPoints(pointers_centers);
+
                 Contour::drawPoly(alpha_buffor, pointers_centers, pc, Scalar(rgb_color[0], rgb_color[1], rgb_color[2]));
             }
         }
         else //nie ma wskaźnika na ekranie
         {
-            state_time_counter -= dt;
-            if(state_time_counter <= 0) //zezwalamy na rozpoczęcie przenoszenia
+            if(state != AS_SHOWING) state_time_counter -= dt;
+            if(state_time_counter <= 0 && state != AS_SHOWING) state = AS_SHOWING;
+            if(state == AS_SHOWING)
             {
-                state_time_counter = 0;
-                state = AS_SHOWING;
+                state_time_counter += dt;
+                if(state_time_counter > max_state_time_counter / 2) state_time_counter = max_state_time_counter / 2;
                 draw_points.clear();
             }
         }
@@ -169,10 +183,6 @@ void FrameCalculation::calculate(Mat &frame)
         }
 
         output = Contour::alphaBlend(output, alpha_buffor, 0.8);
-
-        string text = "Przedzial: (" + intToString(lower_color[0]) + "; " + intToString(lower_color[1]) + "; " + intToString(lower_color[2]) + ") - "
-                +  "(" + intToString(upper_color[0]) + "; " + intToString(upper_color[1]) + "; " + intToString(upper_color[2]) + ")";
-        putText(output, text, Point(10, 20), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 0, 0), 2);
     }
     else
     {
@@ -225,12 +235,12 @@ void FrameCalculation::calibration(Mat &frame, int dt)
     else if(calibration_time_counter > 0) calibration_time_counter -= dt;
 
     rectangle(output, cr, Scalar(255, 0, 0), 2);
-    string text = "Przedzial: (" + intToString(lower_color[0]) + "; " + intToString(lower_color[1]) + "; " + intToString(lower_color[2]) + ") - "
+    string text = "Przedzial koloru: (" + intToString(lower_color[0]) + "; " + intToString(lower_color[1]) + "; " + intToString(lower_color[2]) + ") - "
             +  "(" + intToString(upper_color[0]) + "; " + intToString(upper_color[1]) + "; " + intToString(upper_color[2]) + ")";
     putText(output, text, Point(10, 20), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 0, 0), 2);
     text = "Wypelnienie: " + intToString(area_sum / cm.total() * 100) + "%";
     putText(output, text, Point(10, 40), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 0, 0), 2);
-    text = "Kalibracja: " + intToString(calibration_time_counter) + "%";
+    text = "Kalibracja: " + intToString(calibration_time_counter * 100 / max_calibration_time_counter) + "%";
     putText(output, text, Point(10, 60), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 0, 0), 2);
 }
 
